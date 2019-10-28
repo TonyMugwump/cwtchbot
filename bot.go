@@ -2,6 +2,7 @@ package bot
 
 import (
 	"cwtch.im/cwtch/app"
+	"cwtch.im/cwtch/app/plugins"
 	"cwtch.im/cwtch/event"
 	"cwtch.im/cwtch/peer"
 	"git.openprivacy.ca/openprivacy/libricochet-go/connectivity"
@@ -34,6 +35,7 @@ func (cb *CwtchBot) Launch() {
 	cb.acn.WaitTillBootstrapped()
 	app := app.NewApp(mn, cb.dir)
 
+
 	app.LoadProfiles("")
 	if len(app.ListPeers()) == 0 {
 		app.CreatePeer(cb.peername, "")
@@ -41,6 +43,7 @@ func (cb *CwtchBot) Launch() {
 
 	peers := app.ListPeers()
 	for onion, _ := range peers {
+		app.AddPeerPlugin(onion, plugins.CONNECTIONRETRY)
 		cb.Peer = app.GetPeer(onion)
 		log.Infof("Running %v", onion)
 		cb.Queue = event.NewQueue()
