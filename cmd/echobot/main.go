@@ -29,7 +29,10 @@ func main() {
 		case event.NewMessageFromPeer:
 			log.Infof("New Event: %v", message)
 			cwtchbot.Queue.Publish(event.NewEvent(event.PeerAcknowledgement, map[event.Field]string{event.EventID: message.EventID, event.RemotePeer: message.Data[event.RemotePeer]}))
-			cwtchbot.Peer.SendMessageToPeer(message.Data[event.RemotePeer], message.Data[event.Data])
+			msg := cwtchbot.UnpackMessage(message.Data[event.Data])
+			log.Infof("Message: %v", msg)
+			reply := string(cwtchbot.PackMessage(msg.Overlay, msg.Data))
+			cwtchbot.Peer.SendMessageToPeer(message.Data[event.RemotePeer], reply)
 		case event.PeerStateChange:
 			state := message.Data[event.ConnectionState]
 			if state == connections.ConnectionStateName[connections.AUTHENTICATED] {

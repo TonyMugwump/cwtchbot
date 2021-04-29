@@ -7,6 +7,7 @@ import (
 	"cwtch.im/cwtch/event"
 	"cwtch.im/cwtch/peer"
 	"encoding/base64"
+	"encoding/json"
 	"git.openprivacy.ca/openprivacy/connectivity"
 	"git.openprivacy.ca/openprivacy/connectivity/tor"
 	"git.openprivacy.ca/openprivacy/log"
@@ -30,6 +31,25 @@ func NewCwtchBot(userdir string, peername string) *CwtchBot {
 	cb.dir = userdir
 	cb.peername = peername
 	return cb
+}
+
+type MessageWrapper struct {
+	Overlay int `json:"o"`
+	Data string `json:"d"`
+}
+
+func (cb * CwtchBot) PackMessage(overlay int, message string) []byte {
+	mw := new(MessageWrapper)
+	mw.Overlay = overlay
+	mw.Data = message
+	data,_ := json.Marshal(mw)
+	return data
+}
+
+func (cb * CwtchBot) UnpackMessage(message string) MessageWrapper {
+	mw := new(MessageWrapper)
+	json.Unmarshal([]byte(message), mw)
+	return *mw
 }
 
 func (cb *CwtchBot) Launch() {
@@ -75,6 +95,7 @@ func (cb *CwtchBot) Launch() {
 		eb.Subscribe(event.SendMessageToPeerError, cb.Queue)
 		eb.Subscribe(event.ServerStateChange, cb.Queue)
 		eb.Subscribe(event.PeerStateChange, cb.Queue)
+		eb.Subscribe(event.NewGetValMessageFromPeer,cb.Queue)
 		time.Sleep(time.Second * 4)
 	}
 	app.LaunchPeers()
