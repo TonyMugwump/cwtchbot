@@ -66,7 +66,7 @@ func main() {
 		case event.NewMessageFromGroup:
 			if message.Data[event.RemotePeer] != cwtchbot.Peer.GetOnion() {
 				log.Infof("New Message: %v\v", message.Data[event.Data])
-				cwtchbot.Peer.SendMessageToGroup(message.Data[event.GroupID], message.Data[event.Data])
+				cwtchbot.Peer.SendMessageToGroupTracked(message.Data[event.GroupID], message.Data[event.Data])
 			}
 		case event.NewMessageFromPeer:
 			log.Infof("New Event: %v", message)
