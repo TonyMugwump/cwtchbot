@@ -11,18 +11,18 @@ import (
 	"git.openprivacy.ca/openprivacy/connectivity"
 	"git.openprivacy.ca/openprivacy/connectivity/tor"
 	"git.openprivacy.ca/openprivacy/log"
+	mrand "math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
-	mrand "math/rand"
 )
 
 type CwtchBot struct {
-	dir   string
-	Peer  peer.CwtchPeer
-	Queue event.Queue
-	acn   connectivity.ACN
+	dir      string
+	Peer     peer.CwtchPeer
+	Queue    event.Queue
+	acn      connectivity.ACN
 	peername string
 }
 
@@ -34,19 +34,19 @@ func NewCwtchBot(userdir string, peername string) *CwtchBot {
 }
 
 type MessageWrapper struct {
-	Overlay int `json:"o"`
-	Data string `json:"d"`
+	Overlay int    `json:"o"`
+	Data    string `json:"d"`
 }
 
-func (cb * CwtchBot) PackMessage(overlay int, message string) []byte {
+func (cb *CwtchBot) PackMessage(overlay int, message string) []byte {
 	mw := new(MessageWrapper)
 	mw.Overlay = overlay
 	mw.Data = message
-	data,_ := json.Marshal(mw)
+	data, _ := json.Marshal(mw)
 	return data
 }
 
-func (cb * CwtchBot) UnpackMessage(message string) MessageWrapper {
+func (cb *CwtchBot) UnpackMessage(message string) MessageWrapper {
 	mw := new(MessageWrapper)
 	json.Unmarshal([]byte(message), mw)
 	return *mw
@@ -65,23 +65,22 @@ func (cb *CwtchBot) Launch() {
 	}
 
 	log.Infof("making directory %v", cb.dir)
-	os.MkdirAll(path.Join(cb.dir, "/.tor","tor"),0700)
+	os.MkdirAll(path.Join(cb.dir, "/.tor", "tor"), 0700)
 	tor.NewTorrc().WithSocksPort(port).WithOnionTrafficOnly().WithControlPort(controlPort).WithHashedPassword(base64.StdEncoding.EncodeToString(key)).Build(filepath.Join(cb.dir, ".tor", "tor", "torrc"))
-	cb.acn, err = tor.NewTorACNWithAuth(path.Join(cb.dir, "/.tor"), "", controlPort, tor.HashedPasswordAuthenticator{base64.StdEncoding.EncodeToString(key)})
+	cb.acn, err = tor.NewTorACNWithAuth(path.Join(cb.dir, "/.tor"), "", path.Join(cb.dir, "/.tor", "data"), controlPort, tor.HashedPasswordAuthenticator{base64.StdEncoding.EncodeToString(key)})
 	if err != nil {
 		log.Errorf("\nError connecting to Tor: %v\n", err)
 	}
 	cb.acn.WaitTillBootstrapped()
 	app := app.NewApp(cb.acn, cb.dir)
 
-
 	app.LoadProfiles("")
-	if len(app.ListPeers()) == 0 {
-		app.CreatePeer(cb.peername, "")
+	if len(app.ListProfiles()) == 0 {
+		app.CreateTaggedPeer(cb.peername, "", "")
 	}
 
-	peers := app.ListPeers()
-	for onion, _ := range peers {
+	peers := app.ListProfiles()
+	for _, onion := range peers {
 		app.AddPeerPlugin(onion, plugins.CONNECTIONRETRY)
 		cb.Peer = app.GetPeer(onion)
 		log.Infof("Running %v", onion)
@@ -95,9 +94,9 @@ func (cb *CwtchBot) Launch() {
 		eb.Subscribe(event.SendMessageToPeerError, cb.Queue)
 		eb.Subscribe(event.ServerStateChange, cb.Queue)
 		eb.Subscribe(event.PeerStateChange, cb.Queue)
-		eb.Subscribe(event.NewGetValMessageFromPeer,cb.Queue)
+		eb.Subscribe(event.NewGetValMessageFromPeer, cb.Queue)
 		time.Sleep(time.Second * 4)
 	}
-	app.LaunchPeers()
+	app.ActivateEngines(true, true, true)
 
 }
