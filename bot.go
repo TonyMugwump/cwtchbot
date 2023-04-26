@@ -3,9 +3,11 @@ package bot
 import (
 	"crypto/rand"
 	"cwtch.im/cwtch/app"
-	"cwtch.im/cwtch/app/plugins"
 	"cwtch.im/cwtch/event"
+	"cwtch.im/cwtch/model/constants"
 	"cwtch.im/cwtch/peer"
+	"cwtch.im/cwtch/protocol/connections"
+	"cwtch.im/cwtch/settings"
 	"encoding/base64"
 	"encoding/json"
 	"git.openprivacy.ca/openprivacy/connectivity"
@@ -19,18 +21,24 @@ import (
 )
 
 type CwtchBot struct {
-	dir      string
-	Peer     peer.CwtchPeer
-	Queue    event.Queue
-	acn      connectivity.ACN
-	peername string
+	dir         string
+	Peer        peer.CwtchPeer
+	Queue       event.Queue
+	acn         connectivity.ACN
+	peername    string
+	engineHooks connections.EngineHooks
 }
 
 func NewCwtchBot(userdir string, peername string) *CwtchBot {
 	cb := new(CwtchBot)
 	cb.dir = userdir
 	cb.peername = peername
+	cb.engineHooks = connections.DefaultEngineHooks{}
 	return cb
+}
+
+func (cb *CwtchBot) HookEngine(hooks connections.EngineHooks) {
+	cb.engineHooks = hooks
 }
 
 type MessageWrapper struct {
@@ -72,18 +80,25 @@ func (cb *CwtchBot) Launch() {
 		log.Errorf("\nError connecting to Tor: %v\n", err)
 	}
 	cb.acn.WaitTillBootstrapped()
-	app := app.NewApp(cb.acn, cb.dir)
+	settingsFile, _ := settings.InitGlobalSettingsFile(cb.dir, "")
+	gSettings := settingsFile.ReadGlobalSettings()
+	gSettings.ExperimentsEnabled = true
+	gSettings.DownloadPath = "./"
+	gSettings.Experiments[constants.FileSharingExperiment] = true
+	gSettings.Experiments[constants.ImagePreviewsExperiment] = true
+	settingsFile.WriteGlobalSettings(gSettings)
+	app := app.NewApp(cb.acn, cb.dir, settingsFile)
+	app.InstallEngineHooks(cb.engineHooks)
 
 	app.LoadProfiles("")
 	if len(app.ListProfiles()) == 0 {
-		app.CreateTaggedPeer(cb.peername, "", "")
+		app.CreateProfile(cb.peername, "", true)
 	}
 
 	peers := app.ListProfiles()
+
 	for _, onion := range peers {
-		app.AddPeerPlugin(onion, plugins.CONNECTIONRETRY)
 		cb.Peer = app.GetPeer(onion)
-		log.Infof("Running %v", onion)
 		cb.Queue = event.NewQueue()
 		eb := app.GetEventBus(onion)
 		eb.Subscribe(event.NewMessageFromPeer, cb.Queue)
@@ -95,7 +110,7 @@ func (cb *CwtchBot) Launch() {
 		eb.Subscribe(event.ServerStateChange, cb.Queue)
 		eb.Subscribe(event.PeerStateChange, cb.Queue)
 		eb.Subscribe(event.NewGetValMessageFromPeer, cb.Queue)
-		time.Sleep(time.Second * 4)
+		eb.Subscribe(event.ContactCreated, cb.Queue)
 	}
 	app.ActivateEngines(true, true, true)
 
