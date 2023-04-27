@@ -1,9 +1,7 @@
-# Cwtch Bot Libraries
+# Cwtch Bot Framework
 
-This repository contains some basic libraries and a few functional Cwtch Bots
+A specialized Cwtch Bot framework in Go that provides a more lightweight and tailored approach to building chat bots for Cwtch. 
 
-* Echo Bot - Simply echos back what you say as a basic example
-* Dev Bot - Provides a few development functions like delayed messaging, scheduled messaging and spam
-* Fuzz Bot - Provides a number of security oriented functions like fuzzing chat messages and invite overlays.
+For an introduction to building chatbots with the CwtchBot framework check out [the building an echobot tutorial](https://docs.cwtch.im/developing/building-a-cwtch-app/building-an-echobot).
 
 If you'd like to get involved please open an issue, or submit a pull request :) 

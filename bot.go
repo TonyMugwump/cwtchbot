@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"cwtch.im/cwtch/app"
 	"cwtch.im/cwtch/event"
-	"cwtch.im/cwtch/model/constants"
 	"cwtch.im/cwtch/peer"
 	"cwtch.im/cwtch/protocol/connections"
 	"cwtch.im/cwtch/settings"
@@ -27,6 +26,7 @@ type CwtchBot struct {
 	acn         connectivity.ACN
 	peername    string
 	engineHooks connections.EngineHooks
+	experiments []string
 }
 
 func NewCwtchBot(userdir string, peername string) *CwtchBot {
@@ -34,6 +34,16 @@ func NewCwtchBot(userdir string, peername string) *CwtchBot {
 	cb.dir = userdir
 	cb.peername = peername
 	cb.engineHooks = connections.DefaultEngineHooks{}
+	cb.experiments = nil
+	return cb
+}
+
+func NewCwtchBotWithExperiments(userdir string, peername string, experiments []string) *CwtchBot {
+	cb := new(CwtchBot)
+	cb.dir = userdir
+	cb.peername = peername
+	cb.engineHooks = connections.DefaultEngineHooks{}
+	cb.experiments = experiments
 	return cb
 }
 
@@ -82,12 +92,27 @@ func (cb *CwtchBot) Launch() {
 	cb.acn.WaitTillBootstrapped()
 	settingsFile, _ := settings.InitGlobalSettingsFile(cb.dir, "")
 	gSettings := settingsFile.ReadGlobalSettings()
-	gSettings.ExperimentsEnabled = true
+
+	if cb.experiments != nil {
+		gSettings.ExperimentsEnabled = true
+	} else {
+		gSettings.ExperimentsEnabled = false
+	}
 	gSettings.DownloadPath = "./"
-	gSettings.Experiments[constants.FileSharingExperiment] = true
-	gSettings.Experiments[constants.ImagePreviewsExperiment] = true
+
+	// Reset all Experiments...
+	for experiment := range gSettings.Experiments {
+		gSettings.Experiments[experiment] = false
+	}
+
+	// Explicitly Enable only the experiments we've specified...
+	for _, experiment := range cb.experiments {
+		gSettings.Experiments[experiment] = true
+	}
+
 	settingsFile.WriteGlobalSettings(gSettings)
 	app := app.NewApp(cb.acn, cb.dir, settingsFile)
+
 	app.InstallEngineHooks(cb.engineHooks)
 
 	app.LoadProfiles("")
